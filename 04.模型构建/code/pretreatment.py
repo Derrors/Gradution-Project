@@ -18,7 +18,7 @@ def get_file_name(file_path):						# 获取file_path路径下的文件名
 
 
 def fenci(eid_path, label_path, event_path):
-	char = '[+\.\!\/_,-?@&""\'‘’”“$%„{}^()#]'		# 要过滤符号列表
+	char = '[+\.\!\/_,-?\[\]@*&""\'‘’”“$%„{}^()#]'	# 要过滤符号列表
 
 	fl = open(label_path + 'labels.txt', 'w')		# 输出标签文件
 
@@ -64,8 +64,8 @@ def word2vector(word_path, vector_path):
 			model.build_vocab(sents, update=True)						# 更新词表
 			model.train(sents, total_examples=model.corpus_count, epochs=model.iter)
 			i += 1
-		print('训练了 ' + str(i) + ' 次...')
-	model.wv.save_word2vec_format(vector_path + 'model.txt', binary=False)
+		print(file + ' 训练成功...')
+	model.save(vector_path + 'word2vec.model')
 
 
 if __name__ == '__main__':
