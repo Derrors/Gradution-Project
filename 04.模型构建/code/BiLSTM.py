@@ -2,7 +2,6 @@
 
 import numpy as np
 import tensorflow as tf
-#from pretretment import get_file_name
 from code.pretretment import get_file_name
 from gensim.models import Word2Vec
 
