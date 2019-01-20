@@ -20,8 +20,10 @@ def get_file_name(file_path):						# 获取file_path路径下的文件名
 def fenci(eid_path, label_path, event_path):
 	char = '[+\.\!\/_,-?\[\]@*&""\'‘’”“$%„{}^()#]'	# 要过滤符号列表
 
-	fl = open(label_path + 'labels.txt', 'w')		# 输出标签文件
+	labels = {}
 
+	fl = open(label_path + 'labels.json', 'w')		# 输出标签文件
+	# fl = open(label_path + 'labels.txt', 'w')
 	with open(label_path + 'label.txt') as lf:
 		lines = lf.readlines()
 		for line in lines:
@@ -29,7 +31,12 @@ def fenci(eid_path, label_path, event_path):
 			m = m[:2]
 			eid = m[0].split(':')[1]
 			label = m[1].split(':')[1]
-			fl.write(eid + ' ' + label + '\n')		# 输出格式'eid label'
+			if int(label) == 0:						# 两类问题的第一类：否
+				labels[eid] = [1, 0]
+			else:
+				labels[eid] = [0, 1]				# 两类问题的第一类：是
+			# fl.write(eid + ' ' + label + '\n')		# 输出格式'eid label'
+	json.dump(labels, fl)
 	fl.close()
 
 	list_eid = get_file_name(eid_path)				# 文件名列表
