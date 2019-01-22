@@ -63,6 +63,7 @@ def get_embeddings(time_steps, embedding_size):
     return inputs_x, inputs_y,  seq_length
 
 
+# 根据训练比例来划分训练集和测试集
 def get_train_test(time_steps, embedding_size, rate=0.8):
     inputs_x, inputs_y, seq_length = get_embeddings(time_steps, embedding_size)
     train_index = int(len(inputs_x) * rate)
@@ -79,19 +80,20 @@ def get_train_test(time_steps, embedding_size, rate=0.8):
 
 
 def BiLSTM(inputs, seq_length, hidden_num, weights, bias):
+    # 搭建双向LSTM模型
     outputs, state = tf.nn.bidirectional_dynamic_rnn(
-        cell_fw=tf.contrib.rnn.LSTMCell(hidden_num),
-        cell_bw=tf.contrib.rnn.LSTMCell(hidden_num),
-        inputs=inputs,
-        sequence_length=seq_length,
+        cell_fw=tf.contrib.rnn.LSTMCell(hidden_num),            # 前向LSTM单元
+        cell_bw=tf.contrib.rnn.LSTMCell(hidden_num),            # 反向LSTM单元
+        inputs=inputs,                                          # 数据输入
+        sequence_length=seq_length,                             # 输入数据的有效序列长度
         dtype=tf.float32
     )
+                                                                # outputs = (output_fw, output_bw)为一个turple
+    outputs = tf.concat(outputs, 2)                             # 将outputs在hidden_num维度上进行拼接
+    output = outputs[:, -1, :]                                  # outputs.shape = (batch_size,time_steps,hidden_num*2)
 
-    outputs = tf.concat(outputs, 2)
-    output = outputs[:, -1, :]
-
-    logits = tf.matmul(output, weights) + bias
-    logits = tf.nn.softmax(logits)
+    logits = tf.matmul(output, weights) + bias                  # 取出最后时刻的输出结果进行softmax操作
+    logits = tf.nn.softmax(logits)                              # logits.shape = (batch_size, classs_num)
 
     return logits
 
@@ -105,6 +107,7 @@ def get_batches(inputs_x, inputs_y, seq_length, batch_size):
         yield inputs_x[begin_i: end_i], inputs_y[begin_i: end_i], seq_length[begin_i: end_i]
 
 
+# 计算预测结果的正确率
 def compute_accuracy(pred, true):
     correct_num = 0
     for n in range(len(pred)):
@@ -124,22 +127,26 @@ def main(_):
 
     train_x, train_y, train_seq, test_x, test_y, test_seq = get_train_test(time_steps, embedding_size, train_rate)
 
+    # 定义输入数据
     X = tf.placeholder(tf.float32, [None, time_steps, embedding_size], name='input_x')
     Y = tf.placeholder(tf.int32, [None, 2], name='input_y')
     seq_length = tf.placeholder(tf.int32, [None], name='seq_length')
+    # 定义并初始化全连接层的权重和偏置项
     weights = tf.Variable(tf.random_uniform([hidden_num * 2, class_num], -0.01, 0.01))
     bias = tf.Variable(tf.random_uniform([class_num], -0.01, 0.01))
 
     logits = BiLSTM(X, seq_length, hidden_num, weights, bias)
-    cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(
+    cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(             # 损失函数通过交叉熵来计算
         labels=Y,
         logits=logits,
         name='cross_entropy')
     cross_entropy_mean = tf.reduce_mean(cross_entropy)
+    # 优化方法采用梯度下降算法
     optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.003).minimize(cross_entropy_mean)
 
     saver = tf.train.Saver()
-    init = tf.global_variables_initializer()
+
+    init = tf.global_variables_initializer()                                # 初始化全部变量
     with tf.Session() as sess:
         sess.run(init)
         print('init variables complete...')
