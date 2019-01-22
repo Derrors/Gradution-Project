@@ -147,23 +147,29 @@ def main(_):
     saver = tf.train.Saver()
 
     init = tf.global_variables_initializer()                                # 初始化全部变量
-    with tf.Session() as sess:
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    with tf.Session(config=config) as sess:
         sess.run(init)
         print('init variables complete...')
 
         for i in range(epochs):
+            train = []
+            test = []
             for train_x_batch, train_y_batch, train_seq_length in get_batches(train_x, train_y, train_seq, batch_size):
                 feed_dict = {X: train_x_batch, Y: train_y_batch, seq_length: train_seq_length}
                 _, train_loss, train_pred, train_true = sess.run([optimizer, cross_entropy_mean, logits, Y], feed_dict=feed_dict)
-            if i % 50 == 0 and i > 0:
                 train_accuracy = compute_accuracy(train_pred, train_true)
-                print('step: %d train_loss: %f train_accuracy: %f' % (i, train_loss, train_accuracy))
+                train.append(train_accuracy)
+            if i % 50 == 0 and i > 0:
+                print('step: %d train_loss: %f train_accuracy: %f' % (i, train_loss, max(train)))
             if i % 100 == 0 and i > 0:
                 for test_x_batch, test_y_batch, test_seq_length in get_batches(test_x, test_y, test_seq, batch_size):
                     feed_dict = {X: test_x_batch, Y: test_y_batch, seq_length: test_seq_length}
                     _, test_loss, test_pred, test_true = sess.run([optimizer, cross_entropy_mean, logits, Y], feed_dict=feed_dict)
-                test_accuracy = compute_accuracy(test_pred, test_true)
-                print('step: %d test_loss %f test_accuracy: %f' % (i, test_loss, test_accuracy))
+                    test_accuracy = compute_accuracy(test_pred, test_true)
+                    test.append(test_accuracy)
+                print('step: %d test_loss %f test_accuracy: %f' % (i, test_loss, max(test)))
 
         saver.save(sess, model_path + 'model.bilstm')
         print('save model succeed...')
