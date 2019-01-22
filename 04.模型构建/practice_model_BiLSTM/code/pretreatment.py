@@ -6,12 +6,12 @@ import re
 import numpy as np
 
 # 配置文件路径
-eid_path = '.../Twitter/json/'						# 源文件路径
-label_path_read = '.../Twitter/'					# 标签路径
+eid_path = '../../Twitter/json/'						# 源文件路径
+label_path_read = '../../Twitter/'					# 标签路径
 label_path_write = '../label/'
 event_path = '../event_text/'					    # 分词处理后的保存路径
-word2vec_path_read = '..../word2vector/'			# 词向量读取路径
-word2vec_path_write = '../word2vec'
+word2vec_path_read = '../../../word2vector/'			# 词向量读取路径
+word2vec_path_write = '../word2vec/'
 
 
 def get_file_name(file_path):						# 获取file_path路径下的文件名
@@ -89,11 +89,13 @@ def build_embeddings(word2vec_path_read, word2vec_path_write):
 		for line in lines:
 			l = line.split()
 			word = l[0]
-			value = np.array(l[1:])
+			value = l[1:]
 			words_embeddings[word] = value
 
 	with open(word2vec_path_write + 'Google_IJCAI2016_w2v.json', 'w') as fj:
 		json.dump(words_embeddings, fj)
+
+	print('word-vector build succeed...')
 
 
 if __name__ == '__main__':
