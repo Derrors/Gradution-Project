@@ -8,16 +8,15 @@ from gensim.models import Word2Vec
 
 # 配置文件路径
 
-event_txt_path = '../data/event_text/'
+event_txt_path = '../event_text/'
 labels_path = '../data/label/'
-vector_path = '../data/word2vec/'
-model_path = '../model/'
+vector_path = '../word2vec/'
 
 
 # 数据预处理，返回处理后的输入数据
 def get_embeddings(time_steps, embedding_size):
-    model = Word2Vec.load(vector_path + 'word2vec.model')       # 读取训练好的词向量模型
-    vector = model.wv                                           # vector为"word:vector"对应表
+    with open(vector_path + 'Google_IJCAI2016_w2v.json', 'r') as fj:
+        vector = json.load(fj)
 
     files = pre.get_file_name(event_txt_path)                   # 获取当前目录下的所有文件名和文件数
     num_event = len(files)
@@ -144,8 +143,6 @@ def main(_):
     # 优化方法采用梯度下降算法
     optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.003).minimize(cross_entropy_mean)
 
-    saver = tf.train.Saver()
-
     init = tf.global_variables_initializer()                                # 初始化全部变量
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
@@ -170,9 +167,6 @@ def main(_):
                     test_accuracy = compute_accuracy(test_pred, test_true)
                     test.append(test_accuracy)
                 print('step: %d test_loss %f test_accuracy: %f' % (i, test_loss, max(test)))
-
-        saver.save(sess, model_path + 'model.bilstm')
-        print('save model succeed...')
 
 
 if __name__ == '__main__':

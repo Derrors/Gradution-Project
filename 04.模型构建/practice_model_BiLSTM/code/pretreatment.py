@@ -3,13 +3,15 @@
 import json
 import os
 import re
-from gensim.models import word2vec
+import numpy as np
 
 # 配置文件路径
-eid_path = '../data/event/'							# 源文件路径
-label_path = '../data/label/'						# 标签路径
-event_path = '../data/event_text/'					# 分词处理后的保存路径
-vector_path = '../data/word2vec/'					# 词向量保存路径
+eid_path = '.../Twitter/json/'						# 源文件路径
+label_path_read = '.../Twitter/'					# 标签路径
+label_path_write = '../label/'
+event_path = '../event_text/'					    # 分词处理后的保存路径
+word2vec_path_read = '..../word2vector/'			# 词向量读取路径
+word2vec_path_write = '../word2vec'
 
 
 def get_file_name(file_path):						# 获取file_path路径下的文件名
@@ -17,14 +19,14 @@ def get_file_name(file_path):						# 获取file_path路径下的文件名
 		return files
 
 
-def fenci(eid_path, label_path, event_path):
+def fenci(eid_path, label_path_read, label_path_write, event_path):
 	char = '[+\.\!\/_,-?\[\]@*&""\'‘’”“$%„{}^()#]'	# 要过滤符号列表
 
 	labels = {}
 
-	fl = open(label_path + 'labels.json', 'w')		# 输出标签文件
+	fl = open(label_path_write + 'labels.json', 'w')		# 输出标签文件
 	# fl = open(label_path + 'labels.txt', 'w')
-	with open(label_path + 'label.txt') as lf:
+	with open(label_path_read + 'label.txt', 'r') as lf:
 		lines = lf.readlines()
 		for line in lines:
 			m = line.split()						# m[:2]为每个子事件的'eid'和'label'
@@ -35,7 +37,7 @@ def fenci(eid_path, label_path, event_path):
 				labels[eid] = [1, 0]
 			else:
 				labels[eid] = [0, 1]				# 两类问题的第一类：是
-			# fl.write(eid + ' ' + label + '\n')		# 输出格式'eid label'
+			# fl.write(eid + ' ' + label + '\n')	# 输出格式'eid label'
 	json.dump(labels, fl)
 	fl.close()
 
@@ -59,7 +61,7 @@ def fenci(eid_path, label_path, event_path):
 					fe.write('\n')
 		fe.close()
 
-
+'''''
 def word2vector(word_path, vector_path):
 	file_list = get_file_name(word_path)
 	i = int(0)
@@ -77,8 +79,24 @@ def word2vector(word_path, vector_path):
 			i += 1
 		print(file + ' 训练成功...')
 	model.save(vector_path + 'word2vec.model')
+'''
+
+
+def build_embeddings(word2vec_path_read, word2vec_path_write):
+	words_embeddings = {}
+	with open(word2vec_path_read + 'Google_IJCAI2016_w2v.txt', 'r') as files:
+		lines = files.readlines()
+		for line in lines:
+			l = line.split()
+			word = l[0]
+			value = np.array(l[1:])
+			words_embeddings[word] = value
+
+	with open(word2vec_path_write + 'Google_IJCAI2016_w2v.json', 'w') as fj:
+		json.dump(words_embeddings, fj)
 
 
 if __name__ == '__main__':
-	fenci(eid_path, label_path, event_path)
-	word2vector(event_path, vector_path)
+	fenci(eid_path, label_path_read, label_path_write, event_path)
+	build_embeddings(word2vec_path_read, word2vec_path_write)
+#	word2vector(event_path, vector_path)
