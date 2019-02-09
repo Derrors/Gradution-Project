@@ -124,7 +124,7 @@ def main(_):
     embedding_size = 300                # 词向量的维度
     hidden_num = 256                    # lstm层的神经元数
     class_num = 2                       # 类别数
-    batch_size = 20                     # batch大小
+    batch_size = 30                     # batch大小
     epochs = 30                         # 迭代次数
     train_rate = 0.7                    # 训练样本占比
 
@@ -163,14 +163,13 @@ def main(_):
                 train_accuracy = compute_accuracy(train_pred, train_true)
                 train.append(train_accuracy)
             
-            print('step: %d train_loss: %f train_accuracy: %f' % (i, train_loss, max(train)))
-            
             for test_x_batch, test_y_batch, test_seq_length in get_batches(test_x, test_y, test_seq, batch_size):
                 feed_dict = {X: test_x_batch, Y: test_y_batch, seq_length: test_seq_length}
                 _, test_loss, test_pred, test_true = sess.run([optimizer, cross_entropy_mean, logits, Y], feed_dict=feed_dict)
                 test_accuracy = compute_accuracy(test_pred, test_true)
                 test.append(test_accuracy)
-            print('step: %d test_loss %f test_accuracy: %f' % (i, test_loss, max(test)))
+
+            print('step: %d train_loss %f train_accuracy: %f loss_loss: %f loss_accuracy: %f' % (i, trian_loss, max(train), test_loss, max(test)))
 
 
 if __name__ == '__main__':
