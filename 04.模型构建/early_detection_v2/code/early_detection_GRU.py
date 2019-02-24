@@ -11,9 +11,9 @@ from keras.layers import Dense,Activation,GRU
 from keras.optimizers import Adam,Adagrad
 import tensorflow as tf
 
-weibo_json_path = '../data/event_json/'
-weibo_label_path = '../data/event_label/label.txt'
-weibo_embedding_path = '../data/emdedding/weibo.json'
+weibo_json_path = '../../Weibo/json/'
+weibo_label_path = '../../Weibo/label.txt'
+weibo_embedding_path = '../data/embedding/weibo.json'
 
 tf.app.flags.DEFINE_integer('N', 20, "TimeSteps")
 tf.app.flags.DEFINE_integer('Hours', 10, "Deadline")
@@ -143,20 +143,23 @@ def GetEmbeddings():
 				vec = np.zeros((300, ), dtype=np.float32)
 				weibo = event_json[i]
 				text = weibo['text']
-				time = weibo['time']
+				time = weibo['t']
 
 				text = StrFilter(text)
 				words = jieba.cut(text, cut_all=False)
+				n = 0
 				for word in words:
+					n += 1
 					if embeddings.__contains__(word):
 						vec = vec + np.array(embeddings[word], dtype=np.float32)
-				if len(words) == 0:
+				if n == 0:
 					vec = vec
 				else:
-					vec = vec / len(words)
+					vec = vec / n
 				post = {'embedding': vec, 'time': time}
 				Event.append(post)
-
+		print('Event length: %d' % len(Event))
+		
 		Embeddings = GetTimeIntervals(Event)
 		if len(Embeddings) < TimeSteps:
 			for i in range(0, TimeSteps-len(Embeddings)):
