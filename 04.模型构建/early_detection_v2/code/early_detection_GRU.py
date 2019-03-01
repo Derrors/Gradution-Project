@@ -7,36 +7,40 @@ import jieba
 import numpy as np
 from keras.utils import np_utils
 from keras.models import Sequential
-from keras.layers import Dense,Activation,GRU
-from keras.optimizers import Adam,Adagrad
+from keras.layers import Dense, Activation, GRU, Dropout
+from keras.optimizers import Adam, Adagrad
 import tensorflow as tf
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 
+# 配置路径信息
 weibo_json_path = '../../Weibo/json/'
 weibo_label_path = '../../Weibo/label.txt'
 weibo_embedding_path = '../data/embedding/weibo.json'
 
+# 配置参数信息
 tf.app.flags.DEFINE_integer('N', 20, "TimeSteps")
-tf.app.flags.DEFINE_integer('Hours', 10, "Deadline")
+tf.app.flags.DEFINE_integer('Hours', 10, "Deadline")			
 FLAGS = tf.app.flags.FLAGS
 
-TimeSteps = FLAGS.N
-Deadline = FLAGS.Hours * 3600
+TimeSteps = FLAGS.N 					# 时间步数
+Deadline = FLAGS.Hours * 3600			# Deadline
 EmbeddingSize = 300
 BatchSize = 30
-OutputSize = 2
-CellNum = 125
-LR = 0.001
+OutputSize = 2                          # 输出维度
+CellNum = 125                           # 隐层单元数
+LR = 0.001                              # 学习率
 
 
+# 过滤文本信息中的非中文字符
 def StrFilter(string):
 	chars = '[a-zA-Z0-9’!"#$%&\'()*+,-./:;<=>?@，。?★、…【】《》？“”‘’！[\\]^_`{|}~]+'
 	string = ''.join(string.split())
 	return re.sub(chars, '', string)
 
 
+# 获取事件列表，格式为：eid, label, posts_num
 def GetEventList():
 	EventList = []
 	with open(weibo_label_path, 'r') as fl:
@@ -45,12 +49,13 @@ def GetEventList():
 			event_str = line.split()
 			eid = (event_str[0].split(':'))[1]
 			label = (event_str[1].split(':'))[1]
-			posts_num= len(event_str[2:])
+			posts_num = len(event_str[2:])
 			event = {'eid': eid, 'label': label, 'posts_num': posts_num}
 			EventList.append(event)
 	return EventList
 
 
+# 获取最大时间跨度的连续时间间隔
 def GetContinuousIntervals(intervals):
 	maxInt = []
 	temp = [intervals[0]]
@@ -66,15 +71,17 @@ def GetContinuousIntervals(intervals):
 	return maxInt
 
 
+# 将事件按时间间隔划分
 def GetTimeIntervals(Event):
-	Event = sorted(Event, key=lambda k: k['time'])
-	t0 = Event[0]['time']
+	Event = sorted(Event, key=lambda k: k['time'])      # post 按时间排序
+	t0 = Event[0]['time']                               # 源微博发表时间
 	PostList = []
 	for i in range(len(Event)):
-		Event[i]['time'] = Event[i]['time'] - t0
+		Event[i]['time'] = Event[i]['time'] - t0        # 每条 post 与源博的时间距离
 		if Event[i]['time'] <= Deadline:
 			PostList.append(Event[i])
 
+	# 划分时间间隔区间
 	L = PostList[-1]['time'] - PostList[0]['time']
 	l = L / TimeSteps
 	k = 0
@@ -128,6 +135,7 @@ def GetTimeIntervals(Event):
 	return Embeddings
 
 
+# 文本分词并转换为词向量表示
 def GetEmbeddings():
 	InputData = []
 	InputLabel = []
@@ -147,12 +155,12 @@ def GetEmbeddings():
 				text = weibo['text']
 				time = weibo['t']
 
-				text = StrFilter(text)
-				words = jieba.cut(text, cut_all=False)
+				text = StrFilter(text)                          # 文本过滤
+				words = jieba.cut(text, cut_all=False)          # 分词
 				n = 0
 				for word in words:
 					n += 1
-					if embeddings.__contains__(word):
+					if embeddings.__contains__(word):           # 向量化
 						vec = vec + np.array(embeddings[word], dtype=np.float32)
 				if n == 0:
 					vec = vec
@@ -165,7 +173,7 @@ def GetEmbeddings():
 		Embeddings = GetTimeIntervals(Event)
 		if len(Embeddings) < TimeSteps:
 			for i in range(0, TimeSteps-len(Embeddings)):
-				Embeddings.append([0.0] * 300)
+				Embeddings.append([0.0] * 300)                  # 时间步补全
 
 		InputData.append(Embeddings[: TimeSteps])
 		InputLabel.append(label)
@@ -176,6 +184,7 @@ def GetEmbeddings():
 def main(_):
 	InputData, InputLabel = GetEmbeddings()
 
+	# 划分训练集及测试集
 	x_train = InputData[: int(len(InputData)*0.8)]
 	y_train = InputLabel[: int(len(InputLabel)*0.8)]
 
@@ -189,21 +198,24 @@ def main(_):
 
 	print('Data preprocessing completed----------')
 
+	# GRU model
 	model = Sequential()
 
 	model.add(GRU(CellNum, input_shape=(TimeSteps, EmbeddingSize)))
+	# model.add(Dropout(0.3))
 	model.add(Dense(OutputSize))
+	# model.add(Dropout(0.3))
 	model.add(Activation('softmax'))
 
 	model.compile(optimizer=Adagrad(LR), loss='binary_crossentropy', metrics=['binary_accuracy'])
 
-	print("Training------------------------------/n")
+	print('Training------------------------------')
 	history = model.fit(x_train, y_train, epochs=30, batch_size=BatchSize)
 	epochs = history.epoch
 	train_loss = history.history['loss']
 	train_acc = history.history['binary_accuracy']
 
-	print("Testing------------------------------")
+	print('Testing------------------------------')
 	loss_and_accuracy = model.evaluate(x_test, y_test, batch_size=y_test.shape[0], verbose=0)
 	print('test loss: ', loss_and_accuracy[0])
 	print('test accuracy: ', loss_and_accuracy[1])
@@ -222,7 +234,8 @@ def main(_):
 	plt.ylabel('Accuracy')
 	plt.ylim((np.min(train_acc), np.max(train_acc)))
 
-	plt.savefig('../result/result.jpg')
+	save_path = os.path.join('../result/', str('deadline_') + str(FLAGS.Hours) + '_hours.jpg')
+	plt.savefig(save_path)
 
 
 if __name__ == '__main__':
