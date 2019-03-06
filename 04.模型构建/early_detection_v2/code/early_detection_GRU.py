@@ -20,29 +20,29 @@ weibo_label_path = '../../Weibo/label.txt'
 weibo_embedding_path = '../data/embedding/weibo.json'
 
 # 配置参数信息
-tf.app.flags.DEFINE_integer('N', 20, "TimeSteps")
-tf.app.flags.DEFINE_integer('Hours', 10, "Deadline")			
+tf.app.flags.DEFINE_integer('N', 20, "time_steps")
+tf.app.flags.DEFINE_integer('Hours', 10, "deadline")
 FLAGS = tf.app.flags.FLAGS
 
-TimeSteps = FLAGS.N 					# 时间步数
-Deadline = FLAGS.Hours * 3600			# Deadline
-EmbeddingSize = 300
-BatchSize = 30
-OutputSize = 2                          # 输出维度
-CellNum = 125                           # 隐层单元数
-LR = 0.001                              # 学习率
+time_steps = FLAGS.N 					# 时间步数
+deadline = FLAGS.Hours * 3600			# Deadline
+embedding_size = 300
+batch_size = 30
+output_size = 2                         # 输出维度
+cell_num = 125                          # 隐层单元数
+learning_rate = 0.001                   # 学习率
 
 
 # 过滤文本信息中的非中文字符
-def StrFilter(string):
+def str_filter(string):
 	chars = '[a-zA-Z0-9’!"#$%&\'()*+,-./:;<=>?@，。?★、…【】《》？“”‘’！[\\]^_`{|}~]+'
 	string = ''.join(string.split())
 	return re.sub(chars, '', string)
 
 
 # 获取事件列表，格式为：eid, label, posts_num
-def GetEventList():
-	EventList = []
+def get_eventlist():
+	event_list = []
 	with open(weibo_label_path, 'r') as fl:
 		lines = fl.readlines()
 		for line in lines:
@@ -51,100 +51,100 @@ def GetEventList():
 			label = (event_str[1].split(':'))[1]
 			posts_num = len(event_str[2:])
 			event = {'eid': eid, 'label': label, 'posts_num': posts_num}
-			EventList.append(event)
-	return EventList
+			event_list.append(event)
+	return event_list
 
 
 # 获取最大时间跨度的连续时间间隔
-def GetContinuousIntervals(intervals):
-	maxInt = []
+def get_continuous_intervals(intervals):
+	max_int = []
 	temp = [intervals[0]]
 	for q in range(1, len(intervals)):
 		if intervals[q] - intervals[q - 1] > 1:
-			if len(temp) > len(maxInt):
-				maxInt = temp
+			if len(temp) > len(max_int):
+				max_int = temp
 			temp = [intervals[q]]
 		else:
 			temp.append(intervals[q])
-	if len(maxInt) == 0:
-		maxInt = temp
-	return maxInt
+	if len(max_int) == 0:
+		max_int = temp
+	return max_int
 
 
 # 将事件按时间间隔划分
-def GetTimeIntervals(Event):
-	Event = sorted(Event, key=lambda k: k['time'])      # post 按时间排序
-	t0 = Event[0]['time']                               # 源微博发表时间
-	PostList = []
-	for i in range(len(Event)):
-		Event[i]['time'] = Event[i]['time'] - t0        # 每条 post 与源博的时间距离
-		if Event[i]['time'] <= Deadline:
-			PostList.append(Event[i])
+def get_time_intervals(event):
+	event = sorted(event, key=lambda k: k['time'])      # post 按时间排序
+	t0 = event[0]['time']                               # 源微博发表时间
+	post_list = []
+	for i in range(len(event)):
+		event[i]['time'] = event[i]['time'] - t0        # 每条 post 与源博的时间距离
+		if event[i]['time'] <= deadline:
+			post_list.append(event[i])
 
 	# 划分时间间隔区间
-	L = PostList[-1]['time'] - PostList[0]['time']
-	l = L / TimeSteps
+	L = post_list[-1]['time'] - post_list[0]['time']
+	l = L / time_steps
 	k = 0
-	PreIntervals = []
-	Embeddings = []
+	pre_intervals = []
+	embeddings = []
 	while True:
 		k += 1
 		index = 0
 		output = []
 		if L == 0:
-			for post in PostList:
+			for post in post_list:
 				output.append(post['embedding'])
 			break
-		start = PostList[0]['time']
+		start = post_list[0]['time']
 		num = int(L / l)
 		intset = []
 		for inter in range(0, num):
 			empty = 0
 			interval = []
-			for j in range(index, len(PostList)):
-				if start <= PostList[j]['time'] < start+l:
+			for j in range(index, len(post_list)):
+				if start <= post_list[j]['time'] < start+l:
 					empty += 1
-					interval.append(PostList[j]['embedding'])
-				elif PostList[j]['time'] >= start+l:
+					interval.append(post_list[j]['embedding'])
+				elif post_list[j]['time'] >= start+l:
 					index = j-1
 					break
 			if empty == 0:
 				output.append([])
 			else:
-				if PostList[-1]['time'] == start+l:
-					interval.append(PostList[-1]['embedding'])
+				if post_list[-1]['time'] == start+l:
+					interval.append(post_list[-1]['embedding'])
 				intset.append(inter)
 				output.append(interval)
-			start = start+l
-		ConIntervals = GetContinuousIntervals(intset)
-		if len(PreIntervals) < len(ConIntervals) < TimeSteps:
+			start = start + l
+		con_intervals = get_continuous_intervals(intset)
+		if len(pre_intervals) < len(con_intervals) < time_steps:
 			l = int(0.5 * l)
-			PreIntervals = ConIntervals
+			pre_intervals = con_intervals
 			if l == 0:
-				output = output[ConIntervals[0]: ConIntervals[-1]+1]
+				output = output[con_intervals[0]: con_intervals[-1]+1]
 				break
 		else:
-			output = output[ConIntervals[0]: ConIntervals[-1]+1]
+			output = output[con_intervals[0]: con_intervals[-1]+1]
 			break
 	for item in output:
 		embedding = np.zeros((300, ), dtype=np.float32)
 		for q in range(len(item)):
 			embedding += item[q]
 		embedding = embedding / len(item)
-		Embeddings.append(embedding)
-	return Embeddings
+		embeddings.append(embedding)
+	return embeddings
 
 
 # 文本分词并转换为词向量表示
-def GetEmbeddings():
-	InputData = []
-	InputLabel = []
-	EventList = GetEventList()
+def get_embeddings():
+	input_data = []
+	input_label = []
+	event_list = get_eventlist()
 	with open(weibo_embedding_path, 'r') as fe:
 		embeddings = json.load(fe)
 
-	for event in EventList:
-		Event = []
+	for event in event_list:
+		events = []
 		label = event['label']
 		event_json_path = os.path.join(weibo_json_path, event['eid'])
 		with open(event_json_path, 'r') as fj:
@@ -155,7 +155,7 @@ def GetEmbeddings():
 				text = weibo['text']
 				time = weibo['t']
 
-				text = StrFilter(text)                          # 文本过滤
+				text = str_filter(text)                         # 文本过滤
 				words = jieba.cut(text, cut_all=False)          # 分词
 				n = 0
 				for word in words:
@@ -167,32 +167,34 @@ def GetEmbeddings():
 				else:
 					vec = vec / n
 				post = {'embedding': vec, 'time': time}
-				Event.append(post)
+				events.append(post)
+
 		#print('Event length: %d' % len(Event))
 		
-		Embeddings = GetTimeIntervals(Event)
-		if len(Embeddings) < TimeSteps:
-			for i in range(0, TimeSteps-len(Embeddings)):
-				Embeddings.append([0.0] * 300)                  # 时间步补全
+		embeddings = get_time_intervals(events)
+		if len(embeddings) < time_steps:
+			for i in range(0, time_steps-len(embeddings)):
+				embeddings.append([0.0] * 300)                  # 时间步补全
 
-		InputData.append(Embeddings[: TimeSteps])
-		InputLabel.append(label)
+		input_data.append(embeddings[: time_steps])
+		input_label.append(label)
 
-	return np.array(InputData), np.array(InputLabel)
+	return np.array(input_data), np.array(input_label)
 
 
 def main(_):
-	InputData, InputLabel = GetEmbeddings()
+	input_data, input_label = get_embeddings()
 
 	# 划分训练集及测试集
-	x_train = InputData[: int(len(InputData)*0.8)]
-	y_train = InputLabel[: int(len(InputLabel)*0.8)]
+	x_train = input_data[: int(len(input_data)*0.8)]
+	y_train = input_label[: int(len(input_label)*0.8)]
 
-	x_test = InputData[int(len(InputData)*0.8):]
-	y_test = InputLabel[int(len(InputLabel)*0.8):]
+	x_test = input_data[int(len(input_data)*0.8):]
+	y_test = input_label[int(len(input_label)*0.8):]
 
-	x_train = x_train.reshape(-1, TimeSteps, EmbeddingSize)
-	X_test = x_test.reshape(-1, TimeSteps, EmbeddingSize)
+	x_train = x_train.reshape(-1, time_steps, embedding_size)
+	x_test = x_test.reshape(-1, time_steps, embedding_size)
+
 	y_train = np_utils.to_categorical(y_train, num_classes=2)
 	y_test = np_utils.to_categorical(y_test, num_classes=2)
 
@@ -201,22 +203,22 @@ def main(_):
 	# GRU model
 	model = Sequential()
 
-	model.add(GRU(CellNum, input_shape=(TimeSteps, EmbeddingSize)))
+	model.add(GRU(cell_num, input_shape=(time_steps, embedding_size)))
 	# model.add(Dropout(0.3))
-	model.add(Dense(OutputSize))
+	model.add(Dense(output_size))
 	# model.add(Dropout(0.3))
 	model.add(Activation('softmax'))
 
-	model.compile(optimizer=Adagrad(LR), loss='binary_crossentropy', metrics=['binary_accuracy'])
+	model.compile(optimizer=Adagrad(learning_rate), loss='binary_crossentropy', metrics=['binary_accuracy'])
 
 	print('Training------------------------------')
-	history = model.fit(x_train, y_train, epochs=30, batch_size=BatchSize)
+	history = model.fit(x_train, y_train, epochs=30, batch_size=batch_size)
 	epochs = history.epoch
 	train_loss = history.history['loss']
 	train_acc = history.history['binary_accuracy']
 
 	print('Testing------------------------------')
-	loss_and_accuracy = model.evaluate(x_test, y_test, batch_size=y_test.shape[0], verbose=0)
+	loss_and_accuracy = model.evaluate(x_test, y_test, batch_size=batch_size, verbose=0)
 	print('test loss: ', loss_and_accuracy[0])
 	print('test accuracy: ', loss_and_accuracy[1])
 
