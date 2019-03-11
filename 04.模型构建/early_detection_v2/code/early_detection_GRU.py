@@ -171,12 +171,12 @@ def get_embeddings():
 
 		#print('Event length: %d' % len(Event))
 		
-		embeddings = get_time_intervals(events)
-		if len(embeddings) < time_steps:
-			for i in range(0, time_steps-len(embeddings)):
-				embeddings.append([0.0] * 300)                  # 时间步补全
+		Embeddings = get_time_intervals(events)
+		if len(Embeddings) < time_steps:
+			for i in range(0, time_steps-len(Embeddings)):
+				Embeddings.append([0.0] * 300)                  # 时间步补全
 
-		input_data.append(embeddings[: time_steps])
+		input_data.append(Embeddings[: time_steps])
 		input_label.append(label)
 
 	return np.array(input_data), np.array(input_label)

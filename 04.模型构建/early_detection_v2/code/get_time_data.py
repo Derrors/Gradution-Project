@@ -7,7 +7,8 @@ from xlsxwriter import *
 weibo_json_path = '../../Weibo/json/'
 weibo_label_path = '../../Weibo/label.txt'
 excel_save_path = '../data/time_data/time_data.xlsx'
-txt_save_path = '../data/time_data/time_data.txt'
+txt_save_path_0 = '../data/time_data/time_data_0.txt'
+txt_save_path_1 = '../data/time_data/time_data_1.txt'
 
 
 # 获取事件列表，格式为：eid, label, posts_num
@@ -64,9 +65,9 @@ def GetExcel():
 			for k in range(event['posts_num']):
 				post = event_json[k]
 				time = (post['t'] - t0) / 60
-				if time <= 6000
-				id_label_times.write(i, j, time, num_format)
-				j += 1
+				if time <= 6000:
+					id_label_times.write(i, j, time, num_format)
+					j += 1
 		i += 1
 	workbook.close()
 
@@ -74,9 +75,11 @@ def GetExcel():
 def GetTxt():
 	EventList = GetEventList()
 
-	ft = open(txt_save_path, 'w')
+	f0 = open(txt_save_path_0, 'w')
+	f1 = open(txt_save_path_1, 'w')
 
 	for event in EventList:
+		label = int(event['label'])
 		posts_num = event['posts_num']
 		event_json_path = os.path.join(weibo_json_path, event['eid'])
 		with open(event_json_path, 'r') as fj:
@@ -86,11 +89,20 @@ def GetTxt():
 			for k in range(event['posts_num']):
 				post = event_json[k]
 				time = (post['t'] - t0) / 60
-				ft.write(str(time))
-				ft.write(' ')
-			ft.write('/n')
 
-	ft.close()
+				if label == 0:
+					f0.write(str(time))
+					f0.write(' ')
+				else:
+					f1.write(str(time))
+					f1.write(' ')
+			if label == 0:
+				f0.write('\n')
+			else:
+				f1.write('\n')
+
+	f0.close()
+	f1.close()
 
 
 if __name__ == '__main__':
