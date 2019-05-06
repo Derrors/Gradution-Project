@@ -5,10 +5,13 @@ import re
 import json
 import jieba
 import numpy as np
+from keras import backend as K
 from keras.utils import np_utils
 from keras.models import Sequential
 from keras.layers import Dense, Activation, GRU, Dropout
 from keras.optimizers import Adam, Adagrad
+from keras.callbacks import Callback
+from sklearn.metrics import f1_score, precision_score, recall_score
 import tensorflow as tf
 import matplotlib as mpl
 mpl.use('Agg')
@@ -20,16 +23,15 @@ weibo_label_path = '../../Weibo/label.txt'
 weibo_embedding_path = '../data/embedding/weibo.json'
 
 # 配置参数信息
-tf.app.flags.DEFINE_integer('N', 20, "time_steps")
-tf.app.flags.DEFINE_integer('Hours', 10, "deadline")
+tf.app.flags.DEFINE_integer('Hours', 1000, "deadline")
 FLAGS = tf.app.flags.FLAGS
 
-time_steps = FLAGS.N 					# 时间步数
+time_steps = 50 					# 时间步数
 deadline = FLAGS.Hours * 3600			# Deadline
 embedding_size = 300
-batch_size = 30
+batch_size = 128
 output_size = 2                         # 输出维度
-cell_num = 125                          # 隐层单元数
+cell_num = 200                          # 隐层单元数
 learning_rate = 0.001                   # 学习率
 
 
@@ -127,7 +129,7 @@ def get_time_intervals(event):
 			output = output[con_intervals[0]: con_intervals[-1]+1]
 			break
 	for item in output:
-		embedding = np.zeros((300, ), dtype=np.float32)
+		embedding = np.zeros((300, ), dtype="float32")
 		for q in range(len(item)):
 			embedding += item[q]
 		embedding = embedding / len(item)
@@ -150,7 +152,7 @@ def get_embeddings():
 		with open(event_json_path, 'r') as fj:
 			event_json = json.load(fj)
 			for i in range(event['posts_num']):
-				vec = np.zeros((300, ), dtype=np.float32)
+				vec = np.zeros((300, ), dtype='float32')
 				weibo = event_json[i]
 				text = weibo['text']
 				time = weibo['t']
@@ -161,7 +163,7 @@ def get_embeddings():
 				for word in words:
 					n += 1
 					if embeddings.__contains__(word):           # 向量化
-						vec = vec + np.array(embeddings[word], dtype=np.float32)
+						vec = vec + np.array(embeddings[word], dtype='float32')
 				if n == 0:
 					vec = vec
 				else:
@@ -181,16 +183,36 @@ def get_embeddings():
 
 	return np.array(input_data), np.array(input_label)
 
+'''
+class Metrics(Callback):
+    def on_train_begin(self, logs={}):
+        self.val_f1s = []
+        self.val_recalls = []
+        self.val_precisions = []
+
+    def on_epoch_end(self, epoch, logs={}):
+        val_predict = (np.asarray(self.model.predict(self.validation_data[0]))).round()
+        val_targ = self.validation_data[1]
+        _val_f1 = f1_score(val_targ, val_predict, average='micro')
+        _val_recall = recall_score(val_targ, val_predict, average='micro')
+        _val_precision = precision_score(val_targ, val_predict, average='micro')
+        self.val_f1s.append(_val_f1)
+        self.val_recalls.append(_val_recall)
+        self.val_precisions.append(_val_precision)
+        print('F1: %.4f Precision: %.4f Recall: %.4f'%(_val_f1, _val_precision, _val_recall))
+        return
+'''
+
 
 def main(_):
 	input_data, input_label = get_embeddings()
 
 	# 划分训练集及测试集
-	x_train = input_data[: int(len(input_data)*0.8)]
-	y_train = input_label[: int(len(input_label)*0.8)]
+	x_train = input_data[int(len(input_data)*0.2): ]
+	y_train = input_label[int(len(input_label)*0.2): ]
 
-	x_test = input_data[int(len(input_data)*0.8):]
-	y_test = input_label[int(len(input_label)*0.8):]
+	x_test = input_data[: int(len(input_data)*0.2)]
+	y_test = input_label[: int(len(input_label)*0.2)]
 
 	x_train = x_train.reshape(-1, time_steps, embedding_size)
 	x_test = x_test.reshape(-1, time_steps, embedding_size)
@@ -203,42 +225,37 @@ def main(_):
 	# GRU model
 	model = Sequential()
 
+	model.add(GRU(cell_num, input_shape=(time_steps, embedding_size), return_sequences=True))
+	model.add(Dropout(0.5))
 	model.add(GRU(cell_num, input_shape=(time_steps, embedding_size)))
-	# model.add(Dropout(0.3))
+	model.add(Dropout(0.5))
 	model.add(Dense(output_size))
-	# model.add(Dropout(0.3))
 	model.add(Activation('softmax'))
-
+	
 	model.compile(optimizer=Adagrad(learning_rate), loss='binary_crossentropy', metrics=['binary_accuracy'])
 
+
 	print('Training------------------------------')
-	history = model.fit(x_train, y_train, epochs=30, batch_size=batch_size)
+	history = model.fit(x_train, y_train, epochs=10, batch_size=batch_size, validation_data=(x_test, y_test))
+
+'''	
 	epochs = history.epoch
 	train_loss = history.history['loss']
 	train_acc = history.history['binary_accuracy']
 
-	print('Testing------------------------------')
-	loss_and_accuracy = model.evaluate(x_test, y_test, batch_size=batch_size, verbose=0)
-	print('test loss: ', loss_and_accuracy[0])
-	print('test accuracy: ', loss_and_accuracy[1])
-
 	plt.figure(0)
-
-	plt.subplot(211)
-	plt.plot(epochs, train_loss, 'rv-')
+	plt.plot(epochs, train_loss, 'ro-')
+	plt.xlabel('Epochs')
 	plt.ylabel('Loss')
 	plt.ylim((np.min(train_loss), np.max(train_loss)))
-	plt.title('Deadline = %d hours' % (FLAGS.Hours))
-	
-	plt.subplot(212)
-	plt.plot(epochs, train_acc, 'b^-')
+	plt.savefig('../result/loss.jpg')
+	plt.figure(1)
+	plt.plot(epochs, train_acc, 'bo-')
 	plt.xlabel('Epochs')
 	plt.ylabel('Accuracy')
 	plt.ylim((np.min(train_acc), np.max(train_acc)))
-
-	save_path = os.path.join('../result/', str('deadline_') + str(FLAGS.Hours) + '_hours.jpg')
-	plt.savefig(save_path)
-
+	plt.savefig('../result/acc.jpg')
+'''
 
 if __name__ == '__main__':
 	tf.app.run()
