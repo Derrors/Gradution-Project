@@ -60,7 +60,7 @@ def main(_):
     fi = concatenate([fi_cnn1, fi_cnn2])
     h = GRU(hidden_size, dropout=0.3)(fi)
     h_ = concatenate([om_pool1, om_pool2, h])
-    re = Dropout(0.5)(h_)
+    re = Dropout(0.3)(h_)
     output = Dense(2, activation='softmax', kernel_regularizer=regularizers.l2(0.01))(re)
 
     # 模型定义
@@ -71,7 +71,11 @@ def main(_):
 
     # 模型训练
     print('Training------------------------------')
-    model.fit([om_train, fi_train], label_train, epochs=30, validation_data=([om_test, fi_test], label_test), batch_size=batch_size)
+    model.fit([om_train, fi_train], label_train, epochs=1, validation_data=([om_test, fi_test], label_test), batch_size=batch_size)
+
+    y = model.predict([om_train, fi_train], batch_size=batch_size)
+
+    print(y)
 
 
 if __name__ == "__main__":
