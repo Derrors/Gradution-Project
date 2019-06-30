@@ -1,0 +1,8 @@
+
+GitHubµÿ÷∑£∫https://github.com/Embedding/Chinese-Word-Vectors.git
+
+Size£∫0.73G
+
+Tokens£∫136M
+
+Vocabulary Size£∫850K

@@ -8,16 +8,15 @@ from gensim.models import Word2Vec
 
 # 配置文件路径
 
-event_txt_path = '../data/event_text/'
-labels_path = '../data/label/'
-vector_path = '../data/word2vec/'
-model_path = '../model/'
+event_txt_path = '../event_text/'
+labels_path = '../label/'
+vector_path = '../word2vec/'
 
 
 # 数据预处理，返回处理后的输入数据
 def get_embeddings(time_steps, embedding_size):
-    model = Word2Vec.load(vector_path + 'word2vec.model')       # 读取训练好的词向量模型
-    vector = model.wv                                           # vector为"word:vector"对应表
+    with open(vector_path + 'Google_IJCAI2016_w2v.json', 'r') as fj:
+        vector = json.load(fj)
 
     files = pre.get_file_name(event_txt_path)                   # 获取当前目录下的所有文件名和文件数
     num_event = len(files)
@@ -40,8 +39,12 @@ def get_embeddings(time_steps, embedding_size):
             for j in range(length):
                 sents = lines[j].split()
                 for word in sents:
-                    vec[j, ] += np.array(vector[word])          # 对每条评论的各词向量求均值
-                vec[j, ] = vec[j, ] / len(sents)
+                    if vector.__contains__(word):
+                        vec[j, ] = vec[j, ] + np.array(vector[word], dtype=np.float32)     # 对每条评论的各词向量求均值
+                if len(sents) == 0:
+                	vec[j, ] = vec[j, ]
+                else:
+                	vec[j, ] = vec[j, ] / len(sents)
     
             if length < time_steps:                             # 评论数少于time_steps,补0
                 inputs_x[i, 0:length, ] = vec[0:length, ]
@@ -121,9 +124,9 @@ def main(_):
     embedding_size = 300                # 词向量的维度
     hidden_num = 256                    # lstm层的神经元数
     class_num = 2                       # 类别数
-    batch_size = 10                     # batch大小
+    batch_size = 30                     # batch大小
     epochs = 30                         # 迭代次数
-    train_rate = 0.8                    # 训练样本占比
+    train_rate = 0.7                    # 训练样本占比
 
     train_x, train_y, train_seq, test_x, test_y, test_seq = get_train_test(time_steps, embedding_size, train_rate)
 
@@ -142,31 +145,31 @@ def main(_):
         name='cross_entropy')
     cross_entropy_mean = tf.reduce_mean(cross_entropy)
     # 优化方法采用梯度下降算法
-    optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.003).minimize(cross_entropy_mean)
-
-    saver = tf.train.Saver()
+    optimizer = tf.train.AdamOptimizer(learning_rate=0.003).minimize(cross_entropy_mean)
 
     init = tf.global_variables_initializer()                                # 初始化全部变量
-    with tf.Session() as sess:
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    with tf.Session(config=config) as sess:
         sess.run(init)
         print('init variables complete...')
 
         for i in range(epochs):
+            train = []
+            test = []
             for train_x_batch, train_y_batch, train_seq_length in get_batches(train_x, train_y, train_seq, batch_size):
                 feed_dict = {X: train_x_batch, Y: train_y_batch, seq_length: train_seq_length}
                 _, train_loss, train_pred, train_true = sess.run([optimizer, cross_entropy_mean, logits, Y], feed_dict=feed_dict)
-            if i % 50 == 0 and i > 0:
                 train_accuracy = compute_accuracy(train_pred, train_true)
-                print('step: %d train_loss: %f train_accuracy: %f' % (i, train_loss, train_accuracy))
-            if i % 100 == 0 and i > 0:
-                for test_x_batch, test_y_batch, test_seq_length in get_batches(test_x, test_y, test_seq, batch_size):
-                    feed_dict = {X: test_x_batch, Y: test_y_batch, seq_length: test_seq_length}
-                    _, test_loss, test_pred, test_true = sess.run([optimizer, cross_entropy_mean, logits, Y], feed_dict=feed_dict)
+                train.append(train_accuracy)
+            
+            for test_x_batch, test_y_batch, test_seq_length in get_batches(test_x, test_y, test_seq, batch_size):
+                feed_dict = {X: test_x_batch, Y: test_y_batch, seq_length: test_seq_length}
+                _, test_loss, test_pred, test_true = sess.run([optimizer, cross_entropy_mean, logits, Y], feed_dict=feed_dict)
                 test_accuracy = compute_accuracy(test_pred, test_true)
-                print('step: %d test_loss %f test_accuracy: %f' % (i, test_loss, test_accuracy))
+                test.append(test_accuracy)
 
-        saver.save(sess, model_path + 'model.bilstm')
-        print('save model succeed...')
+            print('step: %d train_loss %f train_accuracy: %f loss_loss: %f loss_accuracy: %f' % (i, trian_loss, max(train), test_loss, max(test)))
 
 
 if __name__ == '__main__':
